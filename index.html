@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>키움 자동매도</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --border: #e4e6ea;
+    --text: #1a1d23;
+    --muted: #6b7280;
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --danger: #dc2626;
+    --danger-hover: #b91c1c;
+    --success: #16a34a;
+    --warning: #d97706;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
+                 "Noto Sans KR", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    font-size: 15px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
+
+  /* 상단바 */
+  .topbar {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .topbar h1 { font-size: 20px; margin: 0; font-weight: 600; }
+  .topbar .status-group { display: flex; gap: 10px; flex-wrap: wrap; margin-left: auto; align-items: center; }
+  .badge {
+    padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .badge.mock { background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; }
+  .badge.live { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+  .badge.ok { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+  .badge.off { background: #f3f4f6; color: #6b7280; border: 1px solid #d1d5db; }
+  .badge.market-open { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+  .badge.market-closed { background: #f3f4f6; color: #6b7280; border: 1px solid #d1d5db; }
+  .badge.token-ok { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+  .badge.token-warn { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+  .badge.token-err { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+  .badge.badge-today { background: #eff6ff; color: #1e40af; border: 1px solid #93c5fd; font-weight: 600; }
+
+  /* 카드 */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 { margin: 0 0 14px; font-size: 16px; font-weight: 600; }
+  .card .hint { color: var(--muted); font-size: 13px; margin-top: -6px; margin-bottom: 14px; }
+
+  /* 버튼 */
+  button {
+    font-family: inherit; font-size: 14px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--card);
+    color: var(--text); padding: 8px 14px; border-radius: 8px;
+    transition: all 0.12s;
+  }
+  button:hover:not(:disabled) { background: #f9fafb; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.primary { background: var(--primary); color: white; border-color: var(--primary); }
+  button.primary:hover:not(:disabled) { background: var(--primary-hover); }
+  button.danger { background: var(--danger); color: white; border-color: var(--danger); }
+  button.danger:hover:not(:disabled) { background: var(--danger-hover); }
+  button.small { padding: 4px 10px; font-size: 13px; }
+  button.big { padding: 12px 20px; font-size: 15px; font-weight: 500; }
+
+  /* 입력 */
+  input[type="text"], input[type="password"], input[type="number"], select {
+    font-family: inherit; font-size: 14px;
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px; width: 100%;
+    background: var(--card); color: var(--text);
+    transition: border-color 0.12s;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--primary); }
+  label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 14px; }
+  .form-row { margin-bottom: 14px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  /* 표 */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { background: #f9fafb; padding: 10px 12px; text-align: left;
+       font-weight: 500; color: var(--muted); font-size: 13px;
+       border-bottom: 1px solid var(--border); }
+  td { padding: 12px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .profit-plus { color: var(--danger); font-weight: 500; }
+  .profit-minus { color: var(--primary); font-weight: 500; }
+
+  /* 슬롯 상태 뱃지 */
+  .slot-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 12px; font-weight: 500; margin-right: 4px;
+  }
+  .slot-pending { background: #f3f4f6; color: #4b5563; }
+  .slot-ordered { background: #dbeafe; color: #1e40af; }
+  .slot-filled { background: #dcfce7; color: #166534; }
+  .slot-cancelled { background: #fee2e2; color: #991b1b; }
+  .slot-error { background: #fecaca; color: #7f1d1d; }
+
+  /* 모달 */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4); display: none;
+    align-items: center; justify-content: center; z-index: 100; padding: 16px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: white; border-radius: 12px; padding: 24px;
+    max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto;
+  }
+  .modal h3 { margin: 0 0 8px; font-size: 18px; }
+  .modal .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .modal .warning {
+    background: #fffbeb; border: 1px solid #fcd34d; color: #92400e;
+    padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 14px;
+  }
+
+  /* 로그 */
+  .log-item {
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+    font-size: 13px; display: grid;
+    grid-template-columns: 130px 90px 80px 1fr; gap: 10px;
+  }
+  .log-item:last-child { border-bottom: none; }
+  .log-item .ts { color: var(--muted); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; }
+  .log-item .lvl { font-weight: 500; }
+  .log-item.WARN .lvl { color: var(--warning); }
+  .log-item.ERROR .lvl { color: var(--danger); }
+  .log-item.INFO .lvl { color: var(--muted); }
+  .log-item .stk { color: var(--muted); font-family: ui-monospace, monospace; }
+
+  .empty { text-align: center; color: var(--muted); padding: 30px; }
+  .flex { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  /* 호가 힌트 */
+  .tick-hint {
+    margin-top: 6px; font-size: 13px; padding: 6px 10px; border-radius: 6px;
+    min-height: 16px;
+  }
+  .tick-hint.ok { background: #dcfce7; color: #166534; }
+  .tick-hint.auto { background: #e0f2fe; color: #075985; }
+  .tick-hint.warn { background: #fef3c7; color: #92400e; font-weight: 500; }
+
+  .tick-table {
+    background: #f9fafb; border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; font-size: 13px; color: var(--muted);
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px;
+  }
+  .tick-table b { color: var(--text); font-weight: 600; }
+
+  /* 호가창 */
+  .orderbook-card {
+    background: #f9fafb; border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px; margin: 10px 0;
+  }
+  .orderbook-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding-bottom: 10px; margin-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  .orderbook-table { display: flex; flex-direction: column; gap: 3px; }
+  .ob-row {
+    display: grid; grid-template-columns: 50px 1fr 60px;
+    padding: 6px 10px; border-radius: 6px; font-size: 13px;
+    cursor: pointer; transition: background 0.1s;
+    align-items: center;
+  }
+  .ob-row:hover { background: rgba(0,0,0,0.04); }
+  .ob-sell { background: #fef2f2; color: #991b1b; }
+  .ob-sell:hover { background: #fee2e2; }
+  .ob-buy { background: #eff6ff; color: #1e40af; }
+  .ob-buy:hover { background: #dbeafe; }
+  .ob-current {
+    background: #fef3c7; color: #78350f; font-weight: 600;
+    cursor: default; border: 1px dashed #fbbf24;
+  }
+  .ob-current:hover { background: #fef3c7; }
+  .ob-label { font-size: 11px; font-weight: 500; opacity: 0.8; }
+  .ob-price { text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; }
+  .ob-action { text-align: right; font-size: 11px; opacity: 0.6; }
+
+  /* 호가창 프리뷰 */
+  .orderbook-box {
+    margin: 10px 0; background: #f9fafb; border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px; font-size: 13px;
+  }
+  .orderbook-title { font-weight: 600; margin-bottom: 4px; }
+  .orderbook-hint { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+  .orderbook-grid { display: flex; flex-direction: column; gap: 3px; }
+  .ob-row {
+    display: grid; grid-template-columns: 50px 1fr 70px;
+    padding: 7px 10px; border-radius: 6px; cursor: pointer;
+    align-items: center; transition: all 0.12s;
+  }
+  .ob-row:hover { transform: translateX(3px); }
+  .ob-row.ask { background: #fee2e2; color: #991b1b; }
+  .ob-row.ask:hover { background: #fecaca; }
+  .ob-row.bid { background: #dbeafe; color: #1e40af; }
+  .ob-row.bid:hover { background: #bfdbfe; }
+  .ob-row.now {
+    background: #fef3c7; color: #78350f; cursor: default; font-weight: 600;
+    border: 1px solid #fcd34d;
+  }
+  .ob-row .ob-side { font-size: 11px; font-weight: 500; opacity: 0.7; }
+  .ob-row .ob-price { font-family: ui-monospace, monospace; font-weight: 500; text-align: right; }
+  .ob-row .ob-pct { font-size: 11px; text-align: right; opacity: 0.8; }
+
+  /* 대시보드 통계 박스 */
+  .stat-box {
+    flex: 1; min-width: 70px;
+    background: white; border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px; text-align: center;
+  }
+  .stat-num { font-size: 24px; font-weight: 700; line-height: 1.2; }
+  .stat-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* 주문 카드 (대시보드) */
+  .order-card {
+    background: white; border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px; margin-bottom: 10px;
+  }
+  .order-card-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border);
+  }
+  .order-card-title { font-weight: 600; font-size: 15px; }
+  .order-card-subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .progress-bar {
+    height: 8px; background: #f3f4f6; border-radius: 4px; overflow: hidden;
+    margin: 8px 0;
+  }
+  .progress-bar-fill {
+    height: 100%; background: linear-gradient(90deg, #10b981, #059669);
+    transition: width 0.3s;
+  }
+  .order-slot-row {
+    display: flex; align-items: center; gap: 8px; padding: 6px 0;
+    font-size: 13px; border-bottom: 1px dashed #f3f4f6;
+  }
+  .order-slot-row:last-child { border-bottom: none; }
+  .slot-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  }
+  .slot-dot.pending { background: #d1d5db; }
+  .slot-dot.ordered { background: #3b82f6; animation: pulse 1.5s infinite; }
+  .slot-dot.filled { background: #10b981; }
+  .slot-dot.cancelled { background: #ef4444; }
+  .slot-dot.error { background: #dc2626; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* 타임라인 */
+  .timeline-item {
+    display: flex; gap: 12px; padding: 14px 4px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  .timeline-item:last-child { border-bottom: none; }
+  .timeline-item.filled { background: linear-gradient(90deg, rgba(16,185,129,0.04) 0%, transparent 20%); }
+  .timeline-item.error { background: linear-gradient(90deg, rgba(239,68,68,0.06) 0%, transparent 25%); }
+  .timeline-time {
+    flex-shrink: 0; width: 60px;
+    font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted);
+    padding-top: 6px; font-weight: 500;
+  }
+  .timeline-icon {
+    flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .timeline-icon.filled { background: #dcfce7; box-shadow: 0 0 0 3px rgba(16,185,129,0.1); }
+  .timeline-icon.ordered { background: #dbeafe; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+  .timeline-icon.error { background: #fee2e2; box-shadow: 0 0 0 3px rgba(239,68,68,0.1); }
+  .timeline-icon.info { background: #fef3c7; box-shadow: 0 0 0 3px rgba(251,191,36,0.1); }
+  .timeline-content { flex: 1; font-size: 14px; padding-top: 4px; }
+  .timeline-content .title { font-weight: 500; color: var(--text); margin-bottom: 3px; }
+  .timeline-content .detail { color: var(--muted); font-size: 13px; line-height: 1.5; }
+
+  /* ========== 모바일 반응형 (768px 이하) ========== */
+  @media (max-width: 768px) {
+    body { font-size: 14px; }
+    .container { padding: 10px; }
+    .topbar { padding: 10px 14px; gap: 8px; }
+    .topbar h1 { font-size: 17px; width: 100%; }
+    .topbar .status-group { margin-left: 0; width: 100%; justify-content: flex-start; }
+    .badge { font-size: 12px; padding: 4px 9px; }
+    .card { padding: 14px; border-radius: 10px; margin-bottom: 12px; }
+    .card h2 { font-size: 15px; }
+    .hint { font-size: 12px; }
+    .form-grid { grid-template-columns: 1fr; gap: 10px; }
+    button { padding: 10px 14px; font-size: 14px; }
+    button.small { padding: 6px 10px; font-size: 12px; }
+    input[type="text"], input[type="password"], input[type="number"], select {
+      padding: 10px 12px; font-size: 16px; /* iOS 자동 줌 방지 */
+    }
+
+    /* 표 -> 카드 형태로 */
+    table, thead, tbody, th, td, tr { display: block; }
+    thead { display: none; }
+    tr {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+      background: var(--card);
+    }
+    td {
+      border: none;
+      padding: 6px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      text-align: right;
+      font-size: 13px;
+    }
+    td:before {
+      content: attr(data-label);
+      font-weight: 500;
+      color: var(--muted);
+      text-align: left;
+      padding-right: 10px;
+      font-size: 12px;
+    }
+    td.num { text-align: right; }
+    td b { font-size: 15px; }
+
+    /* 슬롯 상세 테이블도 카드처럼 */
+    details table tr { padding: 8px; margin-bottom: 6px; }
+    details table td { padding: 4px 0; font-size: 12px; }
+
+    /* 로그 가로배치 -> 세로배치 */
+    .log-item {
+      grid-template-columns: 1fr;
+      gap: 3px;
+      padding: 10px 0;
+    }
+    .log-item .ts { font-size: 11px; }
+    .log-item .stk { font-size: 11px; }
+
+    /* 모달 풀화면 */
+    .modal-overlay { padding: 0; align-items: flex-end; }
+    .modal {
+      border-radius: 14px 14px 0 0;
+      max-height: 85vh;
+      padding: 18px;
+    }
+    .modal h3 { font-size: 16px; }
+    .modal .modal-actions { flex-direction: column-reverse; }
+    .modal .modal-actions button { width: 100%; padding: 12px; }
+
+    /* 활성 전략 카드 내부 */
+    .strategy-card-header { flex-direction: column; align-items: flex-start !important; gap: 8px; }
+  }
+
+  /* ========== 아주 작은 화면 (iPhone SE 등) ========== */
+  @media (max-width: 380px) {
+    .topbar h1 { font-size: 16px; }
+    .card { padding: 12px; }
+    .badge { font-size: 11px; padding: 3px 8px; }
+  }
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #1f2937; color: white; padding: 10px 18px; border-radius: 8px;
+    font-size: 14px; box-shadow: var(--shadow); z-index: 200;
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .toast.show { opacity: 1; }
+  .toast.error { background: var(--danger); }
+  .toast.success { background: var(--success); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>키움 자동매도</h1>
+  <div class="status-group">
+    <span class="badge" id="badge-mode">로딩...</span>
+    <span class="badge" id="badge-market">로딩...</span>
+    <span class="badge" id="badge-engine">엔진 —</span>
+    <span class="badge" id="badge-token" style="display:none;">토큰 —</span>
+    <span class="badge badge-today" id="badge-today" style="display:none;">오늘 —</span>
+    <button class="small" onclick="refreshAll()" title="모든 데이터 새로고침">🔄 새로고침</button>
+    <button class="danger small" onclick="emergencyStop()">🛑 응급정지</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- 오늘의 주문 현황 -->
+  <div class="card" id="card-dashboard" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-color: #bfdbfe;">
+    <h2>
+      📊 오늘의 주문 현황
+    </h2>
+
+    <!-- 오늘 한눈에 요약 (큰 숫자) -->
+    <div id="today-highlight" style="background: white; border-radius: 10px; padding: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+      <div style="flex:1; min-width: 120px;">
+        <div style="font-size: 12px; color: var(--muted);">오늘 체결</div>
+        <div style="font-size: 28px; font-weight: 700; color: var(--success);">
+          <span id="today-filled-count">0</span><span style="font-size:14px; color:var(--muted); font-weight:400;">건</span>
+        </div>
+        <div style="font-size: 12px; color: var(--muted);">
+          총 <span id="today-filled-qty" style="font-weight:500; color:var(--text);">0</span>주 매도 완료
+        </div>
+      </div>
+      <div style="flex:1; min-width: 120px; border-left: 1px solid var(--border); padding-left: 16px;">
+        <div style="font-size: 12px; color: var(--muted);">대기/주문중</div>
+        <div style="font-size: 28px; font-weight: 700; color: var(--primary);">
+          <span id="today-waiting">0</span><span style="font-size:14px; color:var(--muted); font-weight:400;">건</span>
+        </div>
+        <div style="font-size: 12px; color: var(--muted);" id="today-error-info">오류 0건</div>
+      </div>
+    </div>
+
+    <!-- 시스템 상태 라인 -->
+    <div id="system-health" style="background: white; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 12px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center;">
+      <span id="health-market">🟢 장 진행중</span>
+      <span id="health-token" style="color: var(--muted);">토큰: 확인 중</span>
+      <span id="health-engine" style="color: var(--muted);">엔진: 확인 중</span>
+    </div>
+
+    <div id="summary-bar" style="display:none;">
+      <div class="stat-box"><div class="stat-num" id="stat-active">0</div><div class="stat-label">진행중</div></div>
+      <div class="stat-box"><div class="stat-num" id="stat-filled" style="color: var(--success);">0</div><div class="stat-label">체결</div></div>
+      <div class="stat-box"><div class="stat-num" id="stat-pending" style="color: var(--warning);">0</div><div class="stat-label">대기중</div></div>
+      <div class="stat-box"><div class="stat-num" id="stat-ordered" style="color: var(--primary);">0</div><div class="stat-label">주문중</div></div>
+    </div>
+    <div id="dashboard-content">
+      <p class="empty" style="padding:20px;">전략을 설정하면 여기에 실시간 주문 현황이 표시돼요.</p>
+    </div>
+  </div>
+
+  <!-- API 설정 -->
+  <div class="card" id="card-config">
+    <h2>1단계 · API 설정</h2>
+    <p class="hint">키움증권 OpenAPI 앱키/시크릿키를 입력해 주세요. 처음이라면 반드시 <b>모의투자</b>로 시작하세요.</p>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>앱키 (appkey)</label>
+        <input type="text" id="appkey" placeholder="발급받은 앱키">
+      </div>
+      <div class="form-row">
+        <label>시크릿키 (secretkey)</label>
+        <input type="password" id="secretkey" placeholder="발급받은 시크릿키">
+      </div>
+    </div>
+    <div class="form-row flex">
+      <label style="display: flex; align-items: center; gap: 8px; margin: 0;">
+        <input type="checkbox" id="is_mock" checked>
+        <span>모의투자 모드 (권장)</span>
+      </label>
+    </div>
+    <div class="flex">
+      <button class="primary" onclick="saveConfig()">설정 저장</button>
+      <button onclick="testConnection()">연결 테스트</button>
+      <span id="config-status" style="color: var(--muted); font-size: 13px;"></span>
+    </div>
+  </div>
+
+  <!-- 보유종목 -->
+  <div class="card">
+    <h2 class="flex" style="justify-content: space-between;">
+      <span>2단계 · 보유 종목 & 전략 선택</span>
+      <button class="small" onclick="loadHoldings()">🔄 새로고침</button>
+    </h2>
+    <p class="hint">보유 종목별로 전략을 선택하세요. 홀수 수량이면 자동으로 1주 제외하고 짝수화됩니다.</p>
+    <div id="holdings-table">
+      <p class="empty">🔄 새로고침 버튼을 눌러 보유 종목을 불러오세요.</p>
+    </div>
+  </div>
+
+  <!-- 활성 전략 -->
+  <div class="card">
+    <h2>3단계 · 활성 전략 & 주문 상태</h2>
+    <div id="strategies-list">
+      <p class="empty">활성 전략이 없습니다.</p>
+    </div>
+  </div>
+
+  <!-- 활동 로그 -->
+  <div class="card">
+    <h2>활동 로그 (최근 200건)</h2>
+    <div id="logs-list">
+      <p class="empty">아직 로그가 없습니다.</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- 슬롯 상세 모달 -->
+<div class="modal-overlay" id="slot-detail-modal">
+  <div class="modal">
+    <h3 id="slot-detail-title">주문 상세</h3>
+    <div id="slot-detail-body"></div>
+    <div class="modal-actions">
+      <button onclick="closeSlotDetail()">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 전략 설정 모달 -->
+<div class="modal-overlay" id="strategy-modal">
+  <div class="modal">
+    <h3 id="modal-title">전략 설정</h3>
+    <div class="warning" id="modal-warning" style="display:none;">
+      ⚠️ 기존 전략이 있어 <b>모든 매도 주문이 취소</b>되고 새 전략으로 시작합니다.
+    </div>
+    <div id="modal-stock-info" style="font-size:14px; color: var(--muted); margin-bottom:14px;"></div>
+
+    <!-- 매도 수량 선택 -->
+    <div class="form-row">
+      <label>🎯 매도할 수량
+        <span style="font-weight: 400; font-size: 12px; color: var(--muted);">(보유: <span id="qty-total">0</span>주)</span>
+      </label>
+      <div style="display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;">
+        <button type="button" class="small" onclick="setQtyFraction(0.25)">1/4</button>
+        <button type="button" class="small" onclick="setQtyFraction(0.5)">절반</button>
+        <button type="button" class="small" onclick="setQtyFraction(0.75)">3/4</button>
+        <button type="button" class="small" onclick="setQtyFraction(1.0)">전량</button>
+      </div>
+      <input type="number" id="p-sell-qty" min="1" oninput="validateSellQty()">
+      <div id="p-qty-hint" class="tick-hint"></div>
+    </div>
+
+    <div class="form-row">
+      <label>전략 종류</label>
+      <select id="sel-strategy" onchange="updateStrategyForm()">
+        <option value="">-- 선택 --</option>
+        <option value="day">📈 단타 — 당일 전량 매도 (시가 기준 4분할)</option>
+        <option value="target">🎯 목표가 — 원하는 가격에 4분할 매도</option>
+        <option value="swing1">🌊 스윙 1 — 수익률 도달하면 절반 매도</option>
+        <option value="swing2">🌊 스윙 2 — 기준가 넘으면 장 마감에 절반 매도</option>
+        <option value="swing3">🌊 스윙 3 — 5일선 하락 시 장 마감에 전량 매도</option>
+      </select>
+    </div>
+
+    <div id="params-box"></div>
+
+    <div class="modal-actions">
+      <button onclick="closeModal()">취소</button>
+      <button class="primary" onclick="submitStrategy()">저장하고 시작</button>
+    </div>
+  </div>
+</div>
+
+<!-- 호가창 모달 -->
+<div class="modal-overlay" id="orderbook-modal" onclick="closeOrderbookModal(event)">
+  <div class="modal" onclick="event.stopPropagation();">
+    <h3 id="ob-title">📊 호가창</h3>
+    <div id="ob-content"><p class="empty">조회 중...</p></div>
+    <div class="modal-actions">
+      <button class="primary" onclick="closeOrderbookModal()">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 슬롯 상세 모달 -->
+<div class="modal-overlay" id="slot-modal" onclick="closeSlotModal(event)">
+  <div class="modal" onclick="event.stopPropagation();">
+    <h3>주문 슬롯 상세</h3>
+    <div id="slot-modal-content"></div>
+    <div class="modal-actions">
+      <button class="primary" onclick="closeSlotModal()">닫기</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let currentStock = null;  // 모달에서 편집 중인 종목
+let cachedHoldings = [];
+
+// ---------- 공용 ----------
+async function api(method, url, body) {
+  try {
+    const opt = { method, headers: {'Content-Type': 'application/json'} };
+    if (body) opt.body = JSON.stringify(body);
+    const r = await fetch(url, opt);
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.detail || JSON.stringify(data));
+    return data;
+  } catch (e) {
+    throw e;
+  }
+}
+
+function toast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast ' + type, 3500);
+}
+
+function fmt(n) {
+  if (n === null || n === undefined || n === '') return '-';
+  return Number(n).toLocaleString('ko-KR');
+}
+
+// KRX 호가 단위 (파이썬 round_to_tick과 동일)
+function tickSize(price) {
+  if (price < 2000) return 1;
+  if (price < 5000) return 5;
+  if (price < 20000) return 10;
+  if (price < 50000) return 50;
+  if (price < 200000) return 100;
+  if (price < 500000) return 500;
+  return 1000;
+}
+
+function roundToTick(price) {
+  const t = tickSize(price);
+  return Math.round(price / t) * t;
+}
+
+function showTickHint(inputId, hintId) {
+  const input = document.getElementById(inputId);
+  const hint = document.getElementById(hintId);
+  if (!input || !hint) return;
+  const val = parseInt(input.value);
+  if (!val || val <= 0) { hint.textContent = ''; hint.className = 'tick-hint'; return; }
+  const rounded = roundToTick(val);
+
+  // 현재가 대비 비교 (currentStock이 있을 때만)
+  if (window.currentStock && currentStock.cur_prc) {
+    const cur = currentStock.cur_prc;
+    const diffPct = (val - cur) / cur * 100;
+    if (Math.abs(diffPct) > 30) {
+      const sign = diffPct > 0 ? '+' : '';
+      hint.innerHTML = `❌ 현재가(${fmt(cur)}원) 대비 <b>${sign}${diffPct.toFixed(1)}%</b> — 이 가격으로는 설정할 수 없습니다`;
+      hint.className = 'tick-hint warn';
+      return;
+    }
+    if (Math.abs(diffPct) > 10) {
+      const sign = diffPct > 0 ? '+' : '';
+      hint.innerHTML = `⚠️ 현재가 ${fmt(cur)}원 대비 <b>${sign}${diffPct.toFixed(1)}%</b> — 의도한 가격이 맞나요?`;
+      hint.className = 'tick-hint auto';
+      return;
+    }
+  }
+
+  // 정상 범위면 그냥 확정 가격만 보여줌 (호가 단위 얘기 안 함)
+  hint.textContent = `✓ ${fmt(rounded)}원으로 주문됩니다`;
+  hint.className = 'tick-hint ok';
+}
+
+// 호가창 조회 & 표시
+async function showOrderbook(stkCd) {
+  const box = document.getElementById('orderbook-preview');
+  if (!box) return;
+  box.innerHTML = '<div class="hint" style="padding:10px;">호가 조회중...</div>';
+  try {
+    const ob = await api('GET', `/api/orderbook/${stkCd}`);
+    const asks = (ob.asks || []).slice(0, 5);  // 매도 5호가
+    const bids = (ob.bids || []).slice(0, 5);  // 매수 5호가
+    const cur = ob.cur_prc || 0;
+    const base = ob.base_pric || 0;
+    const diff = base ? ((cur - base) / base * 100) : 0;
+    const diffCls = diff > 0 ? 'profit-plus' : (diff < 0 ? 'profit-minus' : '');
+    const diffStr = diff > 0 ? `+${diff.toFixed(2)}%` : `${diff.toFixed(2)}%`;
+
+    let html = `<div class="orderbook-card">
+      <div class="orderbook-header">
+        <div>
+          <div style="font-size:12px; color:var(--muted);">현재가</div>
+          <div style="font-size:20px; font-weight:700;">${fmt(cur)}원
+            <span class="${diffCls}" style="font-size:13px; margin-left:6px;">${diffStr}</span>
+          </div>
+        </div>
+        <div style="text-align:right; font-size:12px; color:var(--muted);">
+          시가 ${fmt(ob.open_pric)}원<br>
+          고 ${fmt(ob.high_pric)} / 저 ${fmt(ob.low_pric)}<br>
+          전일 ${fmt(base)}원
+        </div>
+      </div>
+      <div class="orderbook-table">`;
+
+    // 매도 호가 (위에서 아래로 높은→낮은 순으로 뒤집어 표시)
+    for (const p of asks.slice().reverse()) {
+      html += `<div class="ob-row ob-sell" onclick="setPriceFromOb(${p})">
+        <span class="ob-label">매도</span>
+        <span class="ob-price">${fmt(p)}원</span>
+        <span class="ob-action">클릭 ↗</span>
+      </div>`;
+    }
+    // 현재가 구분선
+    html += `<div class="ob-row ob-current">
+      <span class="ob-label">현재</span>
+      <span class="ob-price">${fmt(cur)}원</span>
+      <span class="ob-action">${diffStr}</span>
+    </div>`;
+    // 매수 호가 (높은→낮은)
+    for (const p of bids) {
+      html += `<div class="ob-row ob-buy" onclick="setPriceFromOb(${p})">
+        <span class="ob-label">매수</span>
+        <span class="ob-price">${fmt(p)}원</span>
+        <span class="ob-action">클릭 ↗</span>
+      </div>`;
+    }
+    html += `</div>
+      <div class="hint" style="padding:6px 0; font-size:11px;">💡 호가 클릭하면 입력창에 자동 입력돼요</div>
+    </div>`;
+    box.innerHTML = html;
+  } catch(e) {
+    box.innerHTML = `<div class="tick-hint warn">호가 조회 실패: ${e.message}</div>`;
+  }
+}
+
+// 호가 클릭 시 입력창에 가격 자동 입력
+function setPriceFromOb(price) {
+  const targetInput = document.getElementById('p-target-price');
+  const triggerInput = document.getElementById('p-trigger-price');
+  if (targetInput) {
+    targetInput.value = price;
+    showTickHint('p-target-price', 'p-target-hint');
+  }
+  if (triggerInput) {
+    triggerInput.value = price;
+    showTickHint('p-trigger-price', 'p-trigger-hint');
+  }
+  toast(`${fmt(price)}원 입력됨`, 'success');
+}
+
+// 📊 실시간 호가창 조회 후 모달 출력 (+ 가격 한 번 클릭으로 입력 자동 채움)
+async function showOrderbook(stkCd) {
+  const box = document.getElementById('orderbook-preview');
+  if (!box) return;
+  box.innerHTML = '<div class="orderbook-box"><div style="text-align:center; padding:16px;">📡 호가 조회중...</div></div>';
+  try {
+    const ob = await api('GET', `/api/orderbook/${stkCd}`);
+    const cur = ob.cur_prc || 0;
+    const asks = (ob.asks || []).slice(0, 5).reverse(); // 5~1호가 (위→아래)
+    const bids = (ob.bids || []).slice(0, 5);           // 1~5호가 (아래로)
+
+    // 입력창 ID 추측 (현재 열린 모달의 target/trigger 중 하나)
+    const inputId = document.getElementById('p-target-price') ? 'p-target-price' :
+                    document.getElementById('p-trigger-price') ? 'p-trigger-price' : null;
+    const hintId = inputId === 'p-target-price' ? 'p-target-hint' : 'p-trigger-hint';
+
+    const pickPrice = (p) => {
+      if (!inputId) return;
+      const input = document.getElementById(inputId);
+      if (input) { input.value = p; showTickHint(inputId, hintId); }
+    };
+
+    let html = '<div class="orderbook-box">';
+    html += `<div class="orderbook-title">📊 ${ob.stk_nm || stkCd} · 현재가 <b>${fmt(cur)}원</b></div>`;
+    html += '<div class="orderbook-hint">가격을 터치하면 입력창에 자동 채워져요 👆</div>';
+    html += '<div class="orderbook-grid">';
+
+    for (const p of asks) {
+      const pct = cur > 0 ? ((p - cur) / cur * 100) : 0;
+      html += `<div class="ob-row ask" onclick="(${pickPrice.toString()})(${p})">
+        <span class="ob-side">매도</span>
+        <span class="ob-price">${fmt(p)}</span>
+        <span class="ob-pct">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</span>
+      </div>`;
+    }
+    html += `<div class="ob-row now"><span class="ob-side">현재</span><span class="ob-price"><b>${fmt(cur)}</b></span><span class="ob-pct">—</span></div>`;
+    for (const p of bids) {
+      const pct = cur > 0 ? ((p - cur) / cur * 100) : 0;
+      html += `<div class="ob-row bid" onclick="(${pickPrice.toString()})(${p})">
+        <span class="ob-side">매수</span>
+        <span class="ob-price">${fmt(p)}</span>
+        <span class="ob-pct">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</span>
+      </div>`;
+    }
+    html += '</div></div>';
+    box.innerHTML = html;
+  } catch(e) {
+    box.innerHTML = `<div class="orderbook-box" style="color:var(--danger); padding:12px;">호가 조회 실패: ${e.message}</div>`;
+  }
+}
+
+// ---------- 설정 ----------
+async function loadConfig() {
+  try {
+    const cfg = await api('GET', '/api/config');
+    const badge = document.getElementById('badge-mode');
+    if (!cfg.configured) {
+      badge.className = 'badge off';
+      badge.textContent = '미설정';
+      document.getElementById('config-status').textContent = '아직 설정되지 않았습니다';
+    } else {
+      if (cfg.is_mock) {
+        badge.className = 'badge mock';
+        badge.textContent = '모의투자';
+      } else {
+        badge.className = 'badge live';
+        badge.textContent = '⚠️ 실전투자';
+      }
+      document.getElementById('is_mock').checked = cfg.is_mock;
+      document.getElementById('appkey').placeholder = cfg.appkey_masked || '설정됨';
+      document.getElementById('config-status').textContent =
+        '설정 완료 (' + (cfg.is_mock ? '모의' : '실전') + ')';
+    }
+  } catch(e) { console.error(e); }
+}
+
+async function saveConfig() {
+  const appkey = document.getElementById('appkey').value.trim();
+  const secretkey = document.getElementById('secretkey').value.trim();
+  const is_mock = document.getElementById('is_mock').checked;
+  if (!appkey || !secretkey) {
+    toast('앱키와 시크릿키를 모두 입력해주세요', 'error');
+    return;
+  }
+  if (!is_mock) {
+    if (!confirm('⚠️ 실전투자 모드입니다.\n실제 돈이 움직입니다.\n\n계속하시겠습니까?')) return;
+  }
+  try {
+    await api('POST', '/api/config', {appkey, secretkey, is_mock});
+    toast(is_mock ? '저장 완료 (모의)' : '⚠️ 실전 모드로 저장됨!', 'success');
+    document.getElementById('secretkey').value = '';
+    await loadConfig();
+  } catch(e) {
+    toast('저장 실패: ' + e.message, 'error');
+  }
+}
+
+async function testConnection() {
+  try {
+    const r = await api('POST', '/api/test-connection');
+    toast(`연결 성공! (${r.mode}) 토큰: ${r.token_preview}`, 'success');
+  } catch(e) {
+    toast('연결 실패: ' + e.message, 'error');
+  }
+}
+
+// ---------- 상태 ----------
+async function loadStatus() {
+  try {
+    const s = await api('GET', '/api/status');
+    // 장/엔진
+    const m = document.getElementById('badge-market');
+    if (s.market_open) { m.className = 'badge market-open'; m.textContent = '🟢 장 중'; }
+    else if (s.today_is_holiday) { m.className = 'badge market-closed'; m.textContent = '📅 휴장일'; }
+    else { m.className = 'badge market-closed'; m.textContent = '⚫ 장 외'; }
+    m.title = s.status_msg || '';
+
+    const e = document.getElementById('badge-engine');
+    if (s.engine_running) { e.className = 'badge ok'; e.textContent = '⚙️ 엔진 동작중'; }
+    else { e.className = 'badge off'; e.textContent = '⚙️ 엔진 정지'; }
+
+    // 토큰 뱃지
+    const t = document.getElementById('badge-token');
+    if (s.client_configured && s.token_status) {
+      t.style.display = '';
+      if (s.token_status.includes('정상')) {
+        t.className = 'badge token-ok'; t.textContent = '🔑 토큰 정상';
+      } else if (s.token_status.includes('곧 만료')) {
+        t.className = 'badge token-warn'; t.textContent = '⚠️ ' + s.token_status;
+      } else if (s.token_status.includes('만료됨')) {
+        t.className = 'badge token-err'; t.textContent = '❌ 토큰 만료';
+      } else {
+        t.className = 'badge off'; t.textContent = '🔑 ' + s.token_status;
+      }
+      t.title = s.token_status;
+    } else {
+      t.style.display = 'none';
+    }
+
+    // 오늘 체결 요약 뱃지
+    const ts = document.getElementById('badge-today');
+    const sum = s.today_summary || {};
+    if ((sum.filled_count || 0) + (sum.pending_count || 0) + (sum.error_count || 0) > 0) {
+      ts.style.display = '';
+      let parts = [];
+      if (sum.filled_count) parts.push(`✅ 체결 ${sum.filled_count}건(${fmt(sum.filled_qty)}주)`);
+      if (sum.pending_count) parts.push(`⏳ 대기 ${sum.pending_count}`);
+      if (sum.error_count) parts.push(`❌ 오류 ${sum.error_count}`);
+      ts.textContent = '오늘: ' + parts.join(' · ');
+    } else {
+      ts.style.display = 'none';
+    }
+
+    // 대시보드 상단 요약
+    document.getElementById('today-filled-count').textContent = sum.filled_count || 0;
+    document.getElementById('today-filled-qty').textContent = fmt(sum.filled_qty || 0);
+    document.getElementById('today-waiting').textContent = (sum.pending_count || 0);
+    const errInfo = document.getElementById('today-error-info');
+    if ((sum.error_count || 0) > 0) {
+      errInfo.innerHTML = `<span style="color:var(--danger);">⚠️ 오류 ${sum.error_count}건</span>`;
+    } else {
+      errInfo.textContent = '오류 0건';
+    }
+
+    // 시스템 상태 라인
+    const hm = document.getElementById('health-market');
+    hm.textContent = s.status_msg || '장 상태 확인 중';
+    const ht = document.getElementById('health-token');
+    if (s.client_configured) {
+      ht.textContent = `🔑 토큰: ${s.token_status || '—'}`;
+      ht.style.color = s.token_valid ? 'var(--success)' : 'var(--danger)';
+    } else {
+      ht.textContent = '🔑 토큰: 설정 필요';
+      ht.style.color = 'var(--muted)';
+    }
+    const he = document.getElementById('health-engine');
+    he.textContent = s.engine_running ? '⚙️ 엔진: 정상 가동' : '⚙️ 엔진: 정지';
+    he.style.color = s.engine_running ? 'var(--success)' : 'var(--danger)';
+  } catch(e){}
+}
+
+// ---------- 보유 종목 ----------
+async function loadHoldings() {
+  const box = document.getElementById('holdings-table');
+  box.innerHTML = '<p class="empty">조회 중...</p>';
+  try {
+    const r = await api('GET', '/api/holdings');
+    cachedHoldings = r.holdings;
+    const strategies = (await api('GET', '/api/strategies')).strategies;
+    const strategyMap = {};
+    strategies.forEach(s => strategyMap[s.stock_code] = s);
+
+    if (!r.holdings.length) {
+      box.innerHTML = '<p class="empty">보유 종목이 없습니다.</p>';
+      return;
+    }
+    let html = `<table>
+      <thead>
+        <tr>
+          <th>종목명</th><th>코드</th><th class="num">보유수량</th>
+          <th class="num">매입가</th><th class="num">현재가</th>
+          <th>현재 전략</th><th></th>
+        </tr>
+      </thead><tbody>`;
+    for (const h of r.holdings) {
+      const s = strategyMap[h.stk_cd];
+      const curStrat = s ? labelStrat(s.strategy_type) + ` (${s.state})` : '—';
+      html += `<tr>
+        <td data-label="종목명"><b>${h.stk_nm}</b></td>
+        <td data-label="코드">${h.stk_cd}</td>
+        <td data-label="보유수량" class="num">${fmt(h.rmnd_qty)}</td>
+        <td data-label="매입가" class="num">${fmt(h.pur_pric)}</td>
+        <td data-label="현재가" class="num">${fmt(h.cur_prc)}</td>
+        <td data-label="현재 전략">${curStrat}</td>
+        <td><button class="primary small" onclick="openModal('${h.stk_cd}')">전략 설정</button></td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    box.innerHTML = html;
+  } catch(e) {
+    box.innerHTML = `<p class="empty" style="color: var(--danger);">조회 실패: ${e.message}</p>`;
+  }
+}
+
+function labelStrat(t) {
+  return {day:'단타', target:'목표가', swing1:'스윙v1', swing2:'스윙v2', swing3:'스윙v3'}[t] || t;
+}
+
+// ---------- 대시보드 ----------
+let currentView = 'timeline';  // 타임라인 고정
+
+function switchView(v) {
+  // 호환성용 빈 함수
+  currentView = 'timeline';
+  renderDashboard();
+}
+
+let dashboardData = { strategies: [], logs: [] };
+
+async function loadDashboard() {
+  try {
+    const [s, l] = await Promise.all([
+      api('GET', '/api/strategies'),
+      api('GET', '/api/logs?limit=100'),
+    ]);
+    dashboardData.strategies = s.strategies || [];
+    dashboardData.logs = l.logs || [];
+    renderDashboard();
+  } catch(e) { console.error(e); }
+}
+
+function renderDashboard() {
+  const strategies = dashboardData.strategies;
+
+  // 통계
+  let active = 0, filled = 0, pending = 0, ordered = 0;
+  for (const s of strategies) {
+    if (s.state === 'active') active++;
+    for (const sl of (s.slots || [])) {
+      if (sl.status === 'filled') filled++;
+      else if (sl.status === 'pending') pending++;
+      else if (sl.status === 'ordered') ordered++;
+    }
+  }
+  document.getElementById('stat-active').textContent = active;
+  document.getElementById('stat-filled').textContent = filled;
+  document.getElementById('stat-pending').textContent = pending;
+  document.getElementById('stat-ordered').textContent = ordered;
+
+  const box = document.getElementById('dashboard-content');
+  if (!strategies.length) {
+    box.innerHTML = '<p class="empty" style="padding:20px;">전략을 설정하면 여기에 실시간 주문 현황이 표시돼요.</p>';
+    return;
+  }
+
+  if (currentView === 'cards') {
+    box.innerHTML = renderCards(strategies);
+  } else {
+    box.innerHTML = renderTimeline(strategies, dashboardData.logs);
+  }
+}
+
+function renderCards(strategies) {
+  return strategies.map(s => {
+    const slots = s.slots || [];
+    const totalQty = s.total_qty || 0;
+    const filledQty = slots.filter(x => x.status === 'filled').reduce((a, b) => a + (b.qty || 0), 0);
+    const pct = totalQty > 0 ? (filledQty / totalQty * 100) : 0;
+
+    const slotRows = slots.map(sl => {
+      const statusLabel = stateKr(sl.status);
+      const timeStr = sl.filled_at ? formatTime(sl.filled_at) :
+                      sl.ordered_at ? formatTime(sl.ordered_at) :
+                      sl.scheduled_time ? formatTime(sl.scheduled_time) + ' 예약' : '';
+      const priceStr = sl.order_price ? `${fmt(sl.order_price)}원` : (sl.order_tp === 'market' ? '시장가' : '—');
+      const ordNo = sl.order_no ? ` · #${sl.order_no}` : '';
+      // 부분 체결 표시
+      const filledInfo = (sl.filled_qty && sl.filled_qty < sl.qty) ? ` (${sl.filled_qty}/${sl.qty} 부분체결)` : '';
+      return `<div class="order-slot-row" onclick='showSlotDetail(${JSON.stringify(sl).replace(/'/g, "&apos;")}, ${JSON.stringify(s.stock_name || s.stock_code).replace(/'/g, "&apos;")})' style="cursor:pointer;">
+        <span class="slot-dot ${sl.status}"></span>
+        <span style="flex:1;">
+          <b>${sl.qty}주</b>${filledInfo} · ${priceStr} · <span style="color:var(--muted);">${statusLabel}</span>${ordNo}
+        </span>
+        <span style="color:var(--muted); font-size:11px;">${timeStr}</span>
+      </div>`;
+    }).join('');
+
+    const stateBadge = s.state === 'active' ? '🟢 진행중' :
+                       s.state === 'completed' ? '✅ 완료' : '⚫ 종료';
+
+    return `<div class="order-card">
+      <div class="order-card-header">
+        <div>
+          <div class="order-card-title">${s.stock_name || s.stock_code}</div>
+          <div class="order-card-subtitle">${s.stock_code} · ${labelStrat(s.strategy_type)} · ${stateBadge}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:13px; font-weight:600;">${filledQty}/${totalQty}주 체결</div>
+          <div style="font-size:11px; color:var(--muted);">${pct.toFixed(1)}%</div>
+        </div>
+      </div>
+      <div class="progress-bar"><div class="progress-bar-fill" style="width: ${pct}%"></div></div>
+      <div style="margin-top:8px;">${slotRows || '<div style="color:var(--muted); font-size:13px; text-align:center; padding:8px;">슬롯 생성 대기중...</div>'}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderTimeline(strategies, logs) {
+  const events = [];
+  for (const s of strategies) {
+    for (const sl of (s.slots || [])) {
+      if (sl.ordered_at) {
+        events.push({
+          ts: sl.ordered_at,
+          type: 'ordered',
+          stock: s.stock_name || s.stock_code,
+          title: `주문 발사`,
+          qty: sl.qty,
+          price: sl.order_price,
+          orderTp: sl.order_tp,
+          ordNo: sl.order_no,
+          stratType: s.strategy_type,
+        });
+      }
+      if (sl.filled_at) {
+        events.push({
+          ts: sl.filled_at,
+          type: 'filled',
+          stock: s.stock_name || s.stock_code,
+          title: `체결 완료`,
+          qty: sl.qty,
+          price: sl.order_price,
+          orderTp: sl.order_tp,
+          ordNo: sl.order_no,
+          stratType: s.strategy_type,
+        });
+      }
+    }
+  }
+  for (const l of logs) {
+    if (['strategy_set', 'strategy_cancelled', 'cancel_all', 'emergency_stop',
+         'swing1_trigger', 'swing2_trigger', 'swing3_trigger',
+         'day_init', 'target_init', 'day_b_fallback_init',
+         'target_followup_init', 'order_error', 'api_error'].includes(l.action)) {
+      events.push({
+        ts: l.timestamp,
+        type: l.level === 'ERROR' ? 'error' : 'info',
+        stock: l.stock_code || '',
+        title: actionKr(l.action),
+        detail: l.detail || '',
+      });
+    }
+  }
+  events.sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
+
+  if (!events.length) {
+    return '<p class="empty" style="padding:30px;">📭 아직 발생한 이벤트가 없어요.<br><br><span style="font-size:13px;">전략을 설정하고 장 시간이 되면<br>여기에 주문 내역이 실시간으로 표시됩니다.</span></p>';
+  }
+
+  return events.map(e => {
+    const iconMap = {
+      filled: {icon: '✅', label: '체결'},
+      ordered: {icon: '📤', label: '주문'},
+      error: {icon: '⚠️', label: '오류'},
+      info: {icon: '💡', label: '알림'},
+    };
+    const ic = iconMap[e.type] || iconMap.info;
+
+    // 주문/체결 이벤트는 상세 정보를 더 보기 좋게
+    let detailHtml = '';
+    if (e.type === 'ordered' || e.type === 'filled') {
+      const priceStr = e.orderTp === 'market'
+        ? '<span style="color:var(--warning);">⚡ 시장가</span>'
+        : `지정가 <b>${fmt(e.price)}원</b>`;
+      const stratStr = e.stratType ? `<span style="color:var(--muted); font-size:11px;">· ${labelStrat(e.stratType)}</span>` : '';
+      detailHtml = `<div class="detail">
+        ${priceStr} × <b>${fmt(e.qty)}주</b> ${stratStr}
+        ${e.ordNo ? `<div style="font-size:11px; color:var(--muted); margin-top:2px;">주문번호 #${e.ordNo}</div>` : ''}
+      </div>`;
+    } else if (e.detail) {
+      detailHtml = `<div class="detail">${e.detail}</div>`;
+    }
+
+    return `<div class="timeline-item ${e.type}">
+      <div class="timeline-time">${formatTime(e.ts)}</div>
+      <div class="timeline-icon ${e.type}">${ic.icon}</div>
+      <div class="timeline-content">
+        <div class="title">
+          ${e.stock ? `<b>${e.stock}</b> ` : ''}
+          <span style="color:var(--muted); font-weight:400;">${e.title}</span>
+        </div>
+        ${detailHtml}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function formatTime(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    return `${hh}:${mm}:${ss}`;
+  } catch(e) { return iso; }
+}
+
+function actionKr(a) {
+  const map = {
+    strategy_set: '전략 설정',
+    strategy_cancelled: '전략 해제',
+    cancel_all: '주문 일괄 취소',
+    emergency_stop: '🛑 응급정지',
+    swing1_trigger: '스윙v1 트리거',
+    swing2_trigger: '스윙v2 트리거',
+    swing3_trigger: '스윙v3 트리거',
+    day_init: '단타 초기화',
+    target_init: '목표가 초기화',
+  };
+  return map[a] || a;
+}
+
+// 슬롯 상세 모달
+function showSlotDetail(slot, stockName) {
+  try {
+    const sl = typeof slot === 'string' ? JSON.parse(slot) : slot;
+    const title = document.getElementById('slot-detail-title');
+    const body = document.getElementById('slot-detail-body');
+    title.textContent = `${stockName} · 슬롯 #${sl.slot_index}`;
+
+    const statusLabel = stateKr(sl.status);
+    const priceStr = sl.order_price ? `${fmt(sl.order_price)}원` : (sl.order_tp === 'market' ? '시장가' : '—');
+    const filledPriceStr = sl.filled_price ? `${fmt(sl.filled_price)}원` : '—';
+
+    let html = `<div style="display: grid; grid-template-columns: max-content 1fr; gap: 8px 14px; font-size: 14px;">
+      <div style="color: var(--muted);">상태</div>
+      <div><span class="slot-badge slot-${sl.status}">${statusLabel}</span></div>
+
+      <div style="color: var(--muted);">주문 수량</div>
+      <div>${fmt(sl.qty)}주</div>
+
+      <div style="color: var(--muted);">주문 유형</div>
+      <div>${sl.order_tp === 'market' ? '⚡ 시장가' : '📌 지정가'}</div>
+
+      <div style="color: var(--muted);">지정가</div>
+      <div>${priceStr}</div>`;
+
+    if (sl.filled_qty && sl.filled_qty > 0) {
+      html += `
+      <div style="color: var(--muted);">체결 수량</div>
+      <div style="color: var(--success); font-weight: 600;">${fmt(sl.filled_qty)}주 ${sl.filled_qty < sl.qty ? '(부분 체결)' : '(전량 체결)'}</div>
+
+      <div style="color: var(--muted);">체결가</div>
+      <div>${filledPriceStr}</div>`;
+    }
+
+    if (sl.order_no) {
+      html += `
+      <div style="color: var(--muted);">주문번호</div>
+      <div style="font-family: monospace;">#${sl.order_no}</div>`;
+    }
+
+    if (sl.scheduled_time) {
+      html += `
+      <div style="color: var(--muted);">예약 시각</div>
+      <div>${formatTime(sl.scheduled_time)}</div>`;
+    }
+    if (sl.ordered_at) {
+      html += `
+      <div style="color: var(--muted);">주문 발사</div>
+      <div>${formatTime(sl.ordered_at)}</div>`;
+    }
+    if (sl.filled_at) {
+      html += `
+      <div style="color: var(--muted);">체결 완료</div>
+      <div>${formatTime(sl.filled_at)}</div>`;
+    }
+    if (sl.fallback_deadline) {
+      html += `
+      <div style="color: var(--muted);">fallback 전환</div>
+      <div style="color: var(--warning);">${formatTime(sl.fallback_deadline)}</div>`;
+    }
+    html += `</div>`;
+
+    if (sl.notes) {
+      html += `<div style="margin-top: 12px; padding: 10px; background: #f9fafb; border-radius: 6px; font-size: 12px; color: var(--muted);">
+        📝 ${sl.notes}
+      </div>`;
+    }
+
+    body.innerHTML = html;
+    document.getElementById('slot-detail-modal').classList.add('show');
+  } catch(e) {
+    console.error('슬롯 상세 오류:', e);
+  }
+}
+
+function closeSlotDetail() {
+  document.getElementById('slot-detail-modal').classList.remove('show');
+}
+
+// ---------- 전략 모달 ----------
+
+function setQtyFraction(fraction) {
+  if (!currentStock) return;
+  const total = currentStock.rmnd_qty || 0;
+  let qty = Math.floor(total * fraction);
+  if (qty < 1) qty = 1;
+  document.getElementById('p-sell-qty').value = qty;
+  validateSellQty();
+}
+
+function validateSellQty() {
+  if (!currentStock) return;
+  const input = document.getElementById('p-sell-qty');
+  const hint = document.getElementById('p-qty-hint');
+  const total = currentStock.rmnd_qty || 0;
+  const qty = parseInt(input.value) || 0;
+
+  if (qty <= 0) {
+    hint.textContent = '수량을 입력하세요';
+    hint.className = 'tick-hint warn';
+    return;
+  }
+  if (qty > total) {
+    hint.innerHTML = `❌ 보유 수량(${fmt(total)}주)보다 많습니다`;
+    hint.className = 'tick-hint warn';
+    return;
+  }
+  if (qty < 4) {
+    hint.innerHTML = `❌ 최소 4주 이상이어야 합니다 (4등분 필요)`;
+    hint.className = 'tick-hint warn';
+    return;
+  }
+
+  // 홀수면 1주 제외 안내
+  const reserved = qty % 2 === 1 ? 1 : 0;
+  const effective = qty - reserved;
+  const per = Math.floor(effective / 4);
+  const remainder = effective - per * 4;
+
+  let msg = `✓ <b>${fmt(effective)}주</b>`;
+  if (reserved) msg += ` <span style="color:var(--muted);">(홀수라 1주 제외)</span>`;
+  msg += `<br><span style="color:var(--muted); font-size:12px;">→ 4등분해서 ${per}주씩 매도`;
+  if (remainder > 0) msg += ` (일부는 ${per + 1}주)`;
+  msg += `</span>`;
+
+  hint.innerHTML = msg;
+  hint.className = 'tick-hint ok';
+}
+
+async function openModal(stkCd) {
+  const h = cachedHoldings.find(x => x.stk_cd === stkCd);
+  if (!h) return;
+  currentStock = h;
+  document.getElementById('modal-title').textContent = `전략 설정 · ${h.stk_nm}`;
+  document.getElementById('modal-stock-info').innerHTML =
+    `<b>${h.stk_nm}</b> (${h.stk_cd}) · 보유 ${fmt(h.rmnd_qty)}주 · ` +
+    `현재가 ${fmt(h.cur_prc)}원 · 전일종가 ${fmt(h.pred_close_pric)}원`;
+
+  // 수량 초기화
+  document.getElementById('qty-total').textContent = fmt(h.rmnd_qty);
+  document.getElementById('p-sell-qty').max = h.rmnd_qty;
+  document.getElementById('p-sell-qty').value = h.rmnd_qty;  // 기본: 전량
+  validateSellQty();
+
+  // 기존 전략 있으면 경고
+  try {
+    const strategies = (await api('GET', '/api/strategies')).strategies;
+    const existing = strategies.find(s => s.stock_code === stkCd && s.state === 'active');
+    document.getElementById('modal-warning').style.display = existing ? 'block' : 'none';
+  } catch(e) {}
+
+  document.getElementById('sel-strategy').value = '';
+  document.getElementById('params-box').innerHTML = '';
+  document.getElementById('strategy-modal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('strategy-modal').classList.remove('show');
+  currentStock = null;
+}
+
+function updateStrategyForm() {
+  const t = document.getElementById('sel-strategy').value;
+  const box = document.getElementById('params-box');
+  let html = '';
+  if (t === 'day') {
+    html = `
+      <div class="form-row">
+        <label>단타 전략 요약</label>
+        <p class="hint" style="margin:0; padding:10px; background:#f9fafb; border-radius:8px; line-height:1.7;">
+        • <b>시가가 전일 종가 +4% 이상으로 시작했을 때</b><br>
+        &nbsp;&nbsp;&nbsp;9:00에 1/4을 즉시 매도, 9:05/9:10/9:15에 각 1/4을 현재가로 매도<br>
+        &nbsp;&nbsp;&nbsp;(5분 지나도 안 팔리면 시장가로 전환)<br><br>
+        • <b>시가가 그 이하로 시작했을 때</b><br>
+        &nbsp;&nbsp;&nbsp;처음부터 +4.5%/+5.2%/+5.5%/+5.8%에 각 1/4을 걸어둠<br>
+        &nbsp;&nbsp;&nbsp;12시까지 안 팔린 물량은 12/13/14/14:30에 시장가로 정리
+        </p>
+      </div>
+      <div class="form-row">
+        <label>시가 +4% 미만일 때 매도 가격 (%)</label>
+        <input type="text" id="p-case-b-pcts" value="4.5, 5.2, 5.5, 5.8">
+        <div class="hint" style="font-size:12px; margin-top:4px;">쉼표로 구분, 4개 필요</div>
+      </div>`;
+  } else if (t === 'target') {
+    html = `
+      <div class="form-row">
+        <label>목표가 (원)
+          <button type="button" class="small" style="margin-left:8px;" onclick="showOrderbook('${currentStock.stk_cd}')">📊 지금 가격 확인</button>
+        </label>
+        <input type="number" id="p-target-price" placeholder="예: 75000" min="1"
+               oninput="showTickHint('p-target-price', 'p-target-hint')">
+        <div id="p-target-hint" class="tick-hint"></div>
+      </div>
+      <div id="orderbook-preview"></div>
+      <p class="hint">팔고 싶은 가격의 1/4을 먼저 매도. 체결되면 5분마다 1/4씩 현재가로 추가 매도. 15:20까지 미체결 잔량은 시장가로 일괄 매도.</p>`;
+  } else if (t === 'swing1') {
+    html = `
+      <div class="form-row">
+        <label>수익률 몇 %에 매도 트리거? (%)</label>
+        <input type="number" id="p-gain-pct" value="10" step="0.1" min="0">
+      </div>
+      <p class="hint">전일 종가 대비 설정 %만큼 올랐을 때 절반을 팔리고 있는 가격에 매도. 그게 팔리면 나머지 절반을 15:15에 현재가로 매도. 15:15까지 안 팔리면 전부 취소.</p>`;
+  } else if (t === 'swing2') {
+    html = `
+      <div class="form-row">
+        <label>기준가 (원)
+          <button type="button" class="small" style="margin-left:8px;" onclick="showOrderbook('${currentStock.stk_cd}')">📊 지금 가격 확인</button>
+        </label>
+        <input type="number" id="p-trigger-price" placeholder="예: 15000" min="1"
+               oninput="showTickHint('p-trigger-price', 'p-trigger-hint')">
+        <div id="p-trigger-hint" class="tick-hint"></div>
+      </div>
+      <div id="orderbook-preview"></div>
+      <p class="hint">15:10 시점에 현재가가 기준가를 넘으면, 15:15에 절반을 현재가로 매도.</p>`;
+  } else if (t === 'swing3') {
+    html = `
+      <div class="form-row">
+        <label>5일 평균 대비 몇 % 빠지면 매도? (%)</label>
+        <input type="number" id="p-drop-pct" value="6" step="0.1" min="0">
+      </div>
+      <p class="hint">15:05 시점에 현재가가 최근 5일 평균 종가 대비 설정 %만큼 떨어졌으면, 15:15에 보유분 전량을 현재가로 매도.</p>`;
+  }
+  box.innerHTML = html;
+}
+
+async function submitStrategy() {
+  if (!currentStock) return;
+  const t = document.getElementById('sel-strategy').value;
+  if (!t) { toast('전략을 선택해주세요', 'error'); return; }
+
+  const params = {};
+  if (t === 'day') {
+    const raw = document.getElementById('p-case-b-pcts').value;
+    try {
+      params.case_b_pcts = raw.split(',').map(x => parseFloat(x.trim())).filter(x => !isNaN(x));
+      if (params.case_b_pcts.length !== 4) throw new Error('4개 값이 필요');
+    } catch(e) {
+      toast('Case B 퍼센트 형식 오류 (예: 4.5, 5.2, 5.5, 5.8)', 'error'); return;
+    }
+  } else if (t === 'target') {
+    const raw = parseInt(document.getElementById('p-target-price').value);
+    if (!raw || raw <= 0) { toast('목표가를 입력해주세요', 'error'); return; }
+    // 현재가 대비 ±30% 벗어나면 차단
+    const cur = currentStock.cur_prc || 0;
+    if (cur > 0) {
+      const diff = Math.abs(raw - cur) / cur * 100;
+      if (diff > 30) {
+        const sign = raw > cur ? '+' : '-';
+        toast(`⚠️ 현재가(${fmt(cur)}원) 대비 ${sign}${diff.toFixed(1)}% 벗어난 가격입니다. 확인 후 다시 입력해주세요.`, 'error');
+        return;
+      }
+    }
+    params.target_price = roundToTick(raw);
+  } else if (t === 'swing1') {
+    params.gain_pct = parseFloat(document.getElementById('p-gain-pct').value) || 10;
+  } else if (t === 'swing2') {
+    const raw = parseInt(document.getElementById('p-trigger-price').value);
+    if (!raw || raw <= 0) { toast('기준가를 입력해주세요', 'error'); return; }
+    // 현재가 대비 ±30% 벗어나면 차단
+    const cur = currentStock.cur_prc || 0;
+    if (cur > 0) {
+      const diff = Math.abs(raw - cur) / cur * 100;
+      if (diff > 30) {
+        const sign = raw > cur ? '+' : '-';
+        toast(`⚠️ 현재가(${fmt(cur)}원) 대비 ${sign}${diff.toFixed(1)}% 벗어난 가격입니다. 확인 후 다시 입력해주세요.`, 'error');
+        return;
+      }
+    }
+    params.trigger_price = roundToTick(raw);
+  } else if (t === 'swing3') {
+    params.drop_pct = parseFloat(document.getElementById('p-drop-pct').value) || 6;
+  }
+
+  try {
+    const r = await api('POST', '/api/strategies', {
+      stock_code: currentStock.stk_cd,
+      stock_name: currentStock.stk_nm,
+      strategy_type: t,
+      holding_qty: currentStock.rmnd_qty,
+      params,
+    });
+    toast(`전략 설정 완료 (대상 ${r.total_qty}주, 예비 ${r.reserved_qty}주)`, 'success');
+    closeModal();
+    loadHoldings();
+    loadStrategies();
+  } catch(e) {
+    toast('설정 실패: ' + e.message, 'error');
+  }
+}
+
+// ---------- 활성 전략 ----------
+async function loadStrategies() {
+  const box = document.getElementById('strategies-list');
+  try {
+    const r = await api('GET', '/api/strategies');
+    if (!r.strategies.length) {
+      box.innerHTML = '<p class="empty">활성 전략이 없습니다.</p>';
+      return;
+    }
+    let html = '';
+    for (const s of r.strategies) {
+      const slots = s.slots || [];
+      const slotSummary = ['pending', 'ordered', 'filled', 'cancelled', 'error']
+        .map(st => {
+          const n = slots.filter(x => x.status === st).length;
+          return n ? `<span class="slot-badge slot-${st}">${stateKr(st)} ${n}</span>` : '';
+        }).filter(Boolean).join('');
+
+      html += `<div style="border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:10px;">
+        <div class="flex strategy-card-header" style="justify-content: space-between;">
+          <div>
+            <b>${s.stock_name || s.stock_code}</b> (${s.stock_code}) ·
+            <span style="color: var(--muted);">${labelStrat(s.strategy_type)}</span> ·
+            <span class="slot-badge slot-${s.state === 'active' ? 'ordered' : 'filled'}">${stateKr(s.state)}</span>
+          </div>
+          <button class="danger small" onclick="cancelStrategy('${s.stock_code}')">전략 해제 & 주문 취소</button>
+        </div>
+        <div style="margin-top:8px; font-size:13px; color:var(--muted);">
+          대상 ${s.total_qty}주 (예비 ${s.reserved_qty}주) · 생성 ${s.created_at}
+        </div>
+        <div style="margin-top:8px;">${slotSummary || '<span style="color:var(--muted); font-size:13px;">슬롯 대기중</span>'}</div>`;
+      if (slots.length) {
+        html += `<details style="margin-top:10px;"><summary style="cursor:pointer; color:var(--muted); font-size:13px;">슬롯 상세 (${slots.length})</summary>
+          <table style="margin-top:8px; font-size:13px;">
+            <thead><tr><th>#</th><th>수량</th><th>유형</th><th>가격</th><th>상태</th><th>주문번호</th><th>메모</th></tr></thead>
+            <tbody>`;
+        for (const sl of slots) {
+          html += `<tr>
+            <td data-label="#">${sl.slot_index}</td>
+            <td data-label="수량" class="num">${fmt(sl.qty)}</td>
+            <td data-label="유형">${sl.order_tp || '-'}</td>
+            <td data-label="가격" class="num">${sl.order_price ? fmt(sl.order_price) : '-'}</td>
+            <td data-label="상태"><span class="slot-badge slot-${sl.status}">${stateKr(sl.status)}</span></td>
+            <td data-label="주문번호">${sl.order_no || '-'}</td>
+            <td data-label="메모" style="font-size:12px; color:var(--muted);">${sl.notes || ''}</td>
+          </tr>`;
+        }
+        html += '</tbody></table></details>';
+      }
+      html += '</div>';
+    }
+    box.innerHTML = html;
+  } catch(e) {
+    box.innerHTML = `<p class="empty" style="color: var(--danger);">조회 실패: ${e.message}</p>`;
+  }
+}
+
+function stateKr(s) {
+  return {pending:'대기', ordered:'주문중', filled:'체결', cancelled:'취소',
+          error:'오류', active:'활성', completed:'완료', fallback:'전환'}[s] || s;
+}
+
+async function cancelStrategy(stkCd) {
+  if (!confirm('이 종목의 전략을 해제하고 모든 매도 주문을 취소할까요?')) return;
+  try {
+    const r = await api('POST', `/api/strategies/${stkCd}/cancel`);
+    toast(`전략 해제 (주문 ${r.cancelled_orders}건 취소)`, 'success');
+    loadStrategies();
+    loadHoldings();
+  } catch(e) {
+    toast('취소 실패: ' + e.message, 'error');
+  }
+}
+
+// ---------- 응급정지 ----------
+async function refreshAll() {
+  toast('새로고침 중...', '');
+  try {
+    await Promise.all([
+      loadStatus(),
+      loadDashboard(),
+      loadHoldings(),
+      loadStrategies(),
+      loadLogs(),
+    ]);
+    toast('✓ 새로고침 완료', 'success');
+  } catch(e) {
+    toast('일부 새로고침 실패', 'error');
+  }
+}
+
+async function emergencyStop() {
+  if (!confirm('⚠️ 응급정지: 모든 종목의 모든 매도 주문을 즉시 취소합니다. 계속할까요?')) return;
+  try {
+    const r = await api('POST', '/api/emergency-stop');
+    toast(`응급정지 완료. ${r.cancelled}건 취소`, 'success');
+    loadStrategies();
+    loadLogs();
+  } catch(e) {
+    toast('응급정지 실패: ' + e.message, 'error');
+  }
+}
+
+// ---------- 로그 ----------
+async function loadLogs() {
+  const box = document.getElementById('logs-list');
+  try {
+    const r = await api('GET', '/api/logs?limit=200');
+    if (!r.logs.length) {
+      box.innerHTML = '<p class="empty">아직 로그가 없습니다.</p>';
+      return;
+    }
+    let html = '';
+    for (const l of r.logs) {
+      html += `<div class="log-item ${l.level}">
+        <span class="ts">${l.timestamp}</span>
+        <span class="lvl">${l.level}</span>
+        <span class="stk">${l.stock_code || '—'}</span>
+        <span><b>${l.action}</b> ${l.detail || ''}</span>
+      </div>`;
+    }
+    box.innerHTML = html;
+  } catch(e) {
+    box.innerHTML = `<p class="empty" style="color: var(--danger);">조회 실패: ${e.message}</p>`;
+  }
+}
+
+// ---------- 부팅 & 자동 갱신 ----------
+async function bootstrap() {
+  switchView('timeline');  // 기본: 타임라인 뷰
+  await loadConfig();
+  await loadStatus();
+  await loadDashboard();
+  await loadStrategies();
+  await loadLogs();
+}
+
+bootstrap();
+
+// 주기적 갱신
+setInterval(loadStatus, 10000);       // 10초
+setInterval(loadDashboard, 7000);     // 7초 (대시보드는 가장 자주)
+setInterval(loadStrategies, 15000);   // 15초
+setInterval(loadLogs, 20000);         // 20초
+</script>
+</body>
+</html>
